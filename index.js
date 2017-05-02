@@ -1,6 +1,4 @@
 /**
- * @file index
- * @author Jim Bulkowski <jim.b@paperelectron.com>
  * @project Pomegranate-Aws-Sdk
  * @license MIT {@link http://opensource.org/licenses/MIT}
  */
@@ -14,10 +12,18 @@ const msg = require('./lib/messages')
 const validation = require('./lib/validation')
 
 /**
- * Pomegranate AWS SDK
- * @module index
+ * A configurable loader for AWS-SDK
+ * @module pomegranate-aws-sdk
  */
 
+/**
+ * @type options
+ *
+ * @property {array.<string|{name: string, options: object}>} awsApis - AWS Services that will be loaded into the base AWS injectable object.
+ * Can be either a string of the name of the AWS service, or an object with name and options parameters.
+ * @property {object} awsConfig - Global AWS configuration that will be provided to aws-sdk before any services are instantiated.
+ * @property {object} apiVersions - Api versions this plugin will use, also loaded before any services are instantiated.
+ */
 exports.options = {
   awsApis: [
     'S3'
@@ -30,13 +36,29 @@ exports.options = {
   }
 }
 
+/**
+ *
+ * @type metadata
+ * @property {string} name - AwsSDK: Module Internal name used by its logger.
+ * @property {string} type - service: Is a service type plugin.
+ * @property {string} param - AWS: Available on the injector as AWS.
+ */
+
 exports.metadata = {
   name: 'AwsSDK',
   type: 'service',
   param: 'AWS',
 }
 
+/**
+ *
+ * @type plugin
+ */
 exports.plugin = {
+  /**
+   * Load Hook - Builds the awsApis object and adds it to the injector.
+   * @returns {awsApis} - Adds awsApis to the injector as "AWS"
+   */
   load: function(inject, loaded){
     let Env = inject('Env')
 
@@ -65,30 +87,72 @@ exports.plugin = {
       AWS.config.apiVersions = this.options.apiVersions
     }
 
+    /**
+     * The Main object created by this plugin, containing all of the configured AWS service instances
+     * available for use by any downstream plugin.
+     * @type {awsApis} AwsApis
+     * @property {function} isAvailable
+     * @property {object} AWS_Service_Name - A dynamic property storing the configured AWS API instance.
+     * there will be one for every service listed in the options.awsApis array setting.
+     */
     let awsApis = {}
 
-    /*
-     * Utilities for downstream plugins to interface with.
+    /**
+     * Allows downstream plugins to determine if an AWS API is available.
+     * @param serviceString - The name of the AWS API you wish to find the status of.
+     * @returns {boolean}
      */
     awsApis.isAvailable = function(serviceString){
       return _.isObject(this[serviceString])
     }
 
     _.each(this.options.awsApis, (item)=>{
-      let potentialAwsApi = AWS[item]
-      if(!_.isObject(potentialAwsApi)){
-        this.Logger.warn(`"${item}" is not available to load as an AWS API.`)
+
+      let name
+      let opts = null
+      let potentialAwsApi
+
+      if(_.isObject(item)){
+        if(!_.has(item, 'name')){
+          this.Logger.warn(msg.NO_NAME)
+          return
+        }
+
+        name = item.name
+        if(_.has(item, 'options')){
+          opts = item.options
+        }
+      }
+      else if(_.isString(item)){
+        name = item
+      }
+      else {
+        this.Logger.warn(msg.NOT_VALID)
         return
       }
-      this.Logger.log(`"${item}" will be loaded and available at AWS.${item}`)
-      awsApis[item] = Promise.promisifyAll(new potentialAwsApi())
+
+      potentialAwsApi = AWS[name]
+      if(!_.isObject(potentialAwsApi)){
+        this.Logger.warn(msg.NOT_AVAILABLE(item))
+        return
+      }
+
+      this.Logger.log(msg.LOADED(name))
+
+      awsApis[item] = opts ? Promise.promisifyAll(new potentialAwsApi(opts)) : Promise.promisifyAll(new potentialAwsApi())
     })
 
     loaded(null, awsApis)
   },
+  /**
+   * Start Hook - Not Used.
+   */
   start: function(done){
     done()
   },
+  /**
+   * Stop Hook - Not Used.
+   */
   stop: function(done){
     done()
   }
