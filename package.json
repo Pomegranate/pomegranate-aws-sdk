@@ -1,0 +1,22 @@
+{
+  "name": "pomegranate-aws-sdk",
+  "version": "0.0.0",
+  "description": "Pomegranate plugin providing a promisified, configurable AWS SDK object.",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "Pomegranate",
+    "Plugin",
+    "AWS",
+    "Service"
+  ],
+  "author": "Jim Bulkowski <jim.b@paperelectron.com> (http://paperelectron.com)",
+  "dependencies": {
+    "aws-sdk": "^2.48.0",
+    "bluebird": "^3.5.0",
+    "lodash": "^4.17.4"
+  }
+}
