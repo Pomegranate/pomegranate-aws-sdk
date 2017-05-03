@@ -139,7 +139,7 @@ exports.plugin = {
 
       this.Logger.log(msg.LOADED(name))
 
-      awsApis[item] = opts ? Promise.promisifyAll(new potentialAwsApi(opts)) : Promise.promisifyAll(new potentialAwsApi())
+      awsApis[name] = opts ? Promise.promisifyAll(new potentialAwsApi(opts)) : Promise.promisifyAll(new potentialAwsApi())
     })
 
     loaded(null, awsApis)
