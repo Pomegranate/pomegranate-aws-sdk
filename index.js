@@ -5,12 +5,10 @@
 
 'use strict';
 
-const AWS = require('aws-sdk')
-const Promise = require('bluebird')
-const _ = require('lodash')
-const msg = require('./lib/messages')
-const validation = require('./lib/validation')
-
+const findMocks = require('./lib/findMocks')
+const findActual = require('./lib/findActual')
+const configActual = require('./lib/configActual')
+const loader = require('./lib/loader')
 /**
  * A configurable loader for AWS-SDK
  * @module pomegranate-aws-sdk
@@ -23,17 +21,22 @@ const validation = require('./lib/validation')
  * Can be either a string of the name of the AWS service, or an object with name and options parameters.
  * @property {object} awsConfig - Global AWS configuration that will be provided to aws-sdk before any services are instantiated.
  * @property {object} apiVersions - Api versions this plugin will use, also loaded before any services are instantiated.
+ * @property {boolean} useMocks - Load mock AWS objects instead.
+ * @property {string} mockFile - Path to mock objects file.
  */
 exports.options = {
+  workDir: 'aws-sdk-mocks',
   awsApis: [
-    'S3'
+    'S3',
+    {name: 'CloudWatchLogs', options: {}}
   ],
   awsConfig: {
     region: 'us-east-1'
   },
   apiVersions: {
     S3: '2006-03-01'
-  }
+  },
+  useMocks: false
 }
 
 /**
@@ -61,88 +64,37 @@ exports.plugin = {
    */
   load: function(inject, loaded){
     let Env = inject('Env')
+    let LoadedAwsApis
+    if(this.options.useMocks){
 
-    if(validation.noAuthKeys(Env)){
-      let e = new Error(msg.NO_AUTH)
-      return loaded(e)
+      this.Logger.warn('Using Mock AWS objects.')
+      LoadedAwsApis = findMocks(this.options.workDir)
+
+    } else {
+      this.Logger.log('Using actual AWS API objects, charges may be incurred.')
+      LoadedAwsApis = findActual({Env, Logger: this.Logger})
+        .then((AWS) => {
+          return configActual({
+            AWS,
+            options: this.options,
+            Logger: this.Logger
+          })
+        })
+
     }
 
-    if(!_.isArray(this.options.awsApis)){
-      let e = new Error(msg.NOT_ARRAY)
-      return loaded(e)
-    }
+    LoadedAwsApis
+      .then((Classes) => {
 
-    if(!this.options.awsApis.length){
-      this.Logger.warn('No AWS APIS are configured to load via this plugins settings.')
-      this.Logger.warn('Add needed AWS APIs to the setting "AwsApis" in the settings file.')
-    }
-
-    if(_.isObject(this.options.awsConfig)){
-      this.Logger.log('Updating AWS configuration with provided values.')
-      AWS.config.update(this.options.awsConfig)
-    }
-
-    if(_.isObject(this.options.apiVersions)){
-      this.Logger.log('Updating AWS api versions with provided values.')
-      AWS.config.apiVersions = this.options.apiVersions
-    }
-
-    /**
-     * The Main object created by this plugin, containing all of the configured AWS service instances
-     * available for use by any downstream plugin.
-     * @type {awsApis} AwsApis
-     * @property {function} isAvailable
-     * @property {object} AWS_Service_Name - A dynamic property storing the configured AWS API instance.
-     * there will be one for every service listed in the options.awsApis array setting.
-     */
-    let awsApis = {}
-
-    /**
-     * Allows downstream plugins to determine if an AWS API is available.
-     * @param serviceString - The name of the AWS API you wish to find the status of.
-     * @returns {boolean}
-     */
-    awsApis.isAvailable = function(serviceString){
-      return _.isObject(this[serviceString])
-    }
-
-    _.each(this.options.awsApis, (item)=>{
-
-      let name
-      let opts = null
-      let potentialAwsApi
-
-      if(_.isObject(item)){
-        if(!_.has(item, 'name')){
-          this.Logger.warn(msg.NO_NAME)
-          return
-        }
-
-        name = item.name
-        if(_.has(item, 'options')){
-          opts = item.options
-        }
-      }
-      else if(_.isString(item)){
-        name = item
-      }
-      else {
-        this.Logger.warn(msg.NOT_VALID)
-        return
-      }
-
-      potentialAwsApi = AWS[name]
-      if(!_.isObject(potentialAwsApi)){
-        this.Logger.warn(msg.NOT_AVAILABLE(item))
-        return
-      }
-
-      this.Logger.log(msg.LOADED(name))
-
-      awsApis[name] = opts ? Promise.promisifyAll(new potentialAwsApi(opts)) : Promise.promisifyAll(new potentialAwsApi())
-    })
-
-    loaded(null, awsApis)
+        return loader({Classes, APIs: this.options.awsApis, Logger: this.Logger})
+      })
+      .then((loadObj) => {
+        loaded(null, loadObj)
+      })
+      .catch((err) => {
+        this.Logger.error(err.message)
+        loaded(err)
+      })
   },
   /**
    * Start Hook - Not Used.

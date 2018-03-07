@@ -16,9 +16,10 @@
   ],
   "author": "Jim Bulkowski <jim.b@paperelectron.com> (http://paperelectron.com)",
   "dependencies": {
-    "aws-sdk": "^2.48.0",
-    "bluebird": "^3.5.0",
-    "lodash": "^4.17.4"
+    "aws-sdk": "^2.205.0",
+    "bluebird": "^3.5.1",
+    "lodash": "^4.17.5",
+    "magnum-plugin-utils": "^1.4.0"
   },
   "devDependencies": {
     "documentation": "^4.0.0-rc.1"
