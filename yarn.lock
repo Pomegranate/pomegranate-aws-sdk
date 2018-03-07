@@ -846,7 +846,7 @@ block-stream@*:
   dependencies:
     inherits "~2.0.0"
 
-bluebird@^3.5.1:
+bluebird@^3.3.3, bluebird@^3.5.1:
   version "3.5.1"
   resolved "https://registry.yarnpkg.com/bluebird/-/bluebird-3.5.1.tgz#d9551f9de98f1fcda1e683d17ee91a0602ee2eb9"
 
@@ -1936,7 +1936,7 @@ lodash@^4.0.0, lodash@^4.11.1, lodash@^4.2.0:
   version "4.17.4"
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.4.tgz#78203a4d1c328ae1d86dca6460e369b57f4055ae"
 
-lodash@^4.17.5:
+lodash@^4.17.5, lodash@^4.6.1:
   version "4.17.5"
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.5.tgz#99a92d65c0272debe8c96b6057bc8fbfa3bed511"
 
@@ -1955,6 +1955,14 @@ loose-envify@^1.0.0:
   resolved "https://registry.yarnpkg.com/loose-envify/-/loose-envify-1.3.1.tgz#d1a8ad33fa9ce0e713d65fdd0ac8b748d478c848"
   dependencies:
     js-tokens "^3.0.0"
+
+magnum-plugin-utils@^1.4.0:
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/magnum-plugin-utils/-/magnum-plugin-utils-1.4.0.tgz#fe9b9b325a3e9cefdf0e1bd6a40397839c8c1bc9"
+  dependencies:
+    bluebird "^3.3.3"
+    lodash "^4.6.1"
+    path-parse "^1.0.5"
 
 map-cache@^0.2.0:
   version "0.2.2"

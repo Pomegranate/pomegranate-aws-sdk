@@ -5,12 +5,10 @@
 
 'use strict';
 
-const AWS = require('aws-sdk')
-const Promise = require('bluebird')
-const _ = require('lodash')
-const msg = require('./lib/messages')
-const validation = require('./lib/validation')
-
+const findMocks = require('./lib/findMocks')
+const findActual = require('./lib/findActual')
+const configActual = require('./lib/configActual')
+const loader = require('./lib/loader')
 /**
  * A configurable loader for AWS-SDK
  * @module pomegranate-aws-sdk
@@ -27,6 +25,7 @@ const validation = require('./lib/validation')
  * @property {string} mockFile - Path to mock objects file.
  */
 exports.options = {
+  workDir: 'aws-sdk-mocks',
   awsApis: [
     'S3',
     {name: 'CloudWatchLogs', options: {}}
@@ -37,10 +36,7 @@ exports.options = {
   apiVersions: {
     S3: '2006-03-01'
   },
-  useMocks: false,
-  mockObjects: {
-    S3: './some/path'
-  }
+  useMocks: false
 }
 
 /**
@@ -68,110 +64,37 @@ exports.plugin = {
    */
   load: function(inject, loaded){
     let Env = inject('Env')
+    let LoadedAwsApis
+    if(this.options.useMocks){
 
-    let authCheck = () => Promise.resolve(true)
+      this.Logger.warn('Using Mock AWS objects.')
+      LoadedAwsApis = findMocks(this.options.workDir)
 
-    if(validation.noAuthKeys(Env)){
-      // let e = new Error(msg.NO_AUTH)
-      this.Logger.warn(msg.NO_ENVS)
-      let ecMeta = new AWS.EC2MetadataCredentials()
-
-      authCheck = () => ecMeta.getPromise()
-      // return loaded(e)
-    }
-
-    authCheck()
-      .then(() => {
-        if(!_.isArray(this.options.awsApis)){
-          let e = new Error(msg.NOT_ARRAY)
-          return loaded(e)
-        }
-
-        if(!this.options.awsApis.length){
-          this.Logger.warn('No AWS APIS are configured to load via this plugins settings.')
-          this.Logger.warn('Add needed AWS APIs to the setting "AwsApis" in the settings file.')
-        }
-
-        if(_.isObject(this.options.awsConfig)){
-          this.Logger.log('Updating AWS configuration with provided values.')
-          AWS.config.update(this.options.awsConfig)
-        }
-
-        if(_.isObject(this.options.apiVersions)){
-          this.Logger.log('Updating AWS api versions with provided values.')
-          AWS.config.apiVersions = this.options.apiVersions
-        }
-
-        /**
-         * The Main object created by this plugin, containing all of the configured AWS service instances
-         * available for use by any downstream plugin.
-         * @type {awsApis} AwsApis
-         * @property {function} isAvailable
-         * @property {object} AWS_Service_Name - A dynamic property storing the configured AWS API instance.
-         * there will be one for every service listed in the options.awsApis array setting.
-         */
-        let awsApis = {}
-
-        /**
-         * Allows downstream plugins to determine if an AWS API is available.
-         * @param serviceString - The name of the AWS API you wish to find the status of.
-         * @returns {boolean}
-         */
-        awsApis.isAvailable = function(serviceString){
-          return _.isObject(this[serviceString])
-        }
-
-        _.each(this.options.awsApis, (item)=>{
-
-          let name
-          let opts = null
-          let potentialAwsApi
-
-          if(_.isObject(item)){
-            if(!_.has(item, 'name')){
-              this.Logger.warn(msg.NO_NAME)
-              return
-            }
-
-            name = item.name
-            if(_.has(item, 'options')){
-              opts = item.options
-            }
-          }
-          else if(_.isString(item)){
-            name = item
-          }
-          else {
-            this.Logger.warn(msg.NOT_VALID)
-            return
-          }
-
-          potentialAwsApi = AWS[name]
-          if(!_.isObject(potentialAwsApi)){
-            this.Logger.warn(msg.NOT_AVAILABLE(item))
-            return
-          }
-
-          this.Logger.log(msg.LOADED(name))
-
-          if(this.options.useMocks){
-            // Use provided mock classes.
-            let mock = this.options.mockObjects[name]
-            if(!mock){throw new Error(msg.NO_MOCK(name))}
-            let cls = require(mock)
-            awsApis[name] = opts ? Promise.promisifyAll(new cls(opts)) : Promise.promisifyAll(new cls())
-          } else {
-            awsApis[name] = opts ? Promise.promisifyAll(new potentialAwsApi(opts)) : Promise.promisifyAll(new potentialAwsApi())
-          }
+    } else {
+      this.Logger.log('Using actual AWS API objects, charges may be incurred.')
+      LoadedAwsApis = findActual({Env, Logger: this.Logger})
+        .then((AWS) => {
+          return configActual({
+            AWS,
+            options: this.options,
+            Logger: this.Logger
+          })
         })
 
-        loaded(null, awsApis)
+    }
+
+    LoadedAwsApis
+      .then((Classes) => {
+
+        return loader({Classes, APIs: this.options.awsApis, Logger: this.Logger})
+      })
+      .then((loadObj) => {
+        loaded(null, loadObj)
       })
       .catch((err) => {
+        this.Logger.error(err.message)
         loaded(err)
       })
-
-
   },
   /**
    * Start Hook - Not Used.
@@ -186,3 +109,53 @@ exports.plugin = {
     done()
   }
 }
+
+//Profile explicitly set
+
+// SharedIniFileCredentials {
+//   expired: false,
+//     expireTime: null,
+//     accessKeyId: 'AKIAIVYZDIWXKSRRXX5Q',
+//     sessionToken: undefined,
+//     filename: undefined,
+//     profile: 'bob',
+//     disableAssumeRole: true,
+//     preferStaticCredentials: false }
+
+//Instance role, no ~/.aws/credentials default
+
+// EC2MetadataCredentials {
+//   expired: false,
+//     expireTime: 2018-03-06T23:59:19.000Z,
+//     accessKeyId: 'ASIAJEDXHSI36DMK2KKQ',
+//     sessionToken: 'FQoDYXdzEHsaDD9x+ZDXMZ4p3RFDwSK3A0ElBCa9/uNAizRRVSM6vrD4yYlk1ALUay7gA6LoipeVI7goufa+walFcsDWwEaB/YjvtVB96oFvx8hIRlAPrGzJv/dN6qf2Qk4ZBC/VStWjPdl/TCP9XgOmCVRhb+I787iWht3XliDWVR8PzbjzR0yR7DG8jwdL4l6/Ryx0fZdQSHgiIMTBRpxs01Zl1NQQ8g9G/U3BJuNfvsxIE9avwM0LZh6VLNS+LMZ2lQ8AXWyRuSaqxtJ0kqszm63joLqnlwVCSLaO0HI+S4eS7jTpMKYK52URM3iB2Dx72LoYRL8Ci65mCZHGyvlEu3jjw7klN+fFQ8N08avj1LVuaQNhU2VARlVGka/DMRzzh6AQHGq01eHG8ec7WfJPsachj3l50jXIUFWOnfFTlHH4fLTqleyCLAWdHW4oazRKBgp1NbJCQl7MOor6wHE/+f3GIZYz4kUCM+UxpI3UuXYFGPJfkkzoJ8Krh347gCN+cDZ513+6QxFZqrKyy9euiLIyWAISCFlhrQrLEddGFC1uEVKLVnyd4RXfNcEo0C8G9o4Xb9lGynXFwrlUiodvffZlnr+ELfHliAlHUY8ojJ/71AU=',
+//     metadataService: MetadataService { maxRetries: 3, httpOptions: { timeout: 1000 } },
+//   metadata:
+//   { Code: 'Success',
+//     LastUpdated: '2018-03-06T17:27:40Z',
+//     Type: 'AWS-HMAC',
+//     AccessKeyId: 'ASIAJEDXHSI36DMK2KKQ',
+//     SecretAccessKey: 'bgoWd/ESOtECOLUpUrHgoGB7ZJLP6LyqMmJftoI/',
+//     Token: 'FQoDYXdzEHsaDD9x+ZDXMZ4p3RFDwSK3A0ElBCa9/uNAizRRVSM6vrD4yYlk1ALUay7gA6LoipeVI7goufa+walFcsDWwEaB/YjvtVB96oFvx8hIRlAPrGzJv/dN6qf2Qk4ZBC/VStWjPdl/TCP9XgOmCVRhb+I787iWht3XliDWVR8PzbjzR0yR7DG8jwdL4l6/Ryx0fZdQSHgiIMTBRpxs01Zl1NQQ8g9G/U3BJuNfvsxIE9avwM0LZh6VLNS+LMZ2lQ8AXWyRuSaqxtJ0kqszm63joLqnlwVCSLaO0HI+S4eS7jTpMKYK52URM3iB2Dx72LoYRL8Ci65mCZHGyvlEu3jjw7klN+fFQ8N08avj1LVuaQNhU2VARlVGka/DMRzzh6AQHGq01eHG8ec7WfJPsachj3l50jXIUFWOnfFTlHH4fLTqleyCLAWdHW4oazRKBgp1NbJCQl7MOor6wHE/+f3GIZYz4kUCM+UxpI3UuXYFGPJfkkzoJ8Krh347gCN+cDZ513+6QxFZqrKyy9euiLIyWAISCFlhrQrLEddGFC1uEVKLVnyd4RXfNcEo0C8G9o4Xb9lGynXFwrlUiodvffZlnr+ELfHliAlHUY8ojJ/71AU=',
+//     Expiration: '2018-03-06T23:59:19Z' } }
+
+
+//ENV SET KEYS
+// EnvironmentCredentials {
+//   expired: false,
+//     expireTime: null,
+//     accessKeyId: 'AKIAIVYZDIWXKSRRXX5Q',
+//     sessionToken: undefined,
+//     envPrefix: 'AWS' }
+
+
+// AWS default credentials set
+// SharedIniFileCredentials {
+//   expired: false,
+//     expireTime: null,
+//     accessKeyId: 'AKIAIVYZDIWXKSRRXX5Q',
+//     sessionToken: undefined,
+//     filename: undefined,
+//     profile: 'default',
+//     disableAssumeRole: true,
+//     preferStaticCredentials: false }
