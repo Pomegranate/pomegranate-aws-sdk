@@ -41,7 +41,7 @@ exports.AwsSdk = function(Env){
 The plugin adds an `AWS` property to the Pomegranate dependency injector, this object will contain instantiated,
 configured objects with property names corresponding to the services you provided in its config file.
 
-It also exposes a helper method `AWS#isAvailable(string)` for use by downstream plugins who whish to determine if
+It also exposes a helper method `AWS#isAvailable(string)` for use by downstream plugins who wish to determine if
 a plugin is available.
 
 ## Available AWS APIs

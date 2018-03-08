@@ -41,7 +41,7 @@ exports.AwsSdk = function(Env){
 The plugin adds an `AWS` property to the Pomegranate dependency injector, this object will contain instantiated,
 configured objects with property names corresponding to the services you provided in its config file.
 
-It also exposes a helper method `AWS#isAvailable(string)` for use by downstream plugins who whish to determine if
+It also exposes a helper method `AWS#isAvailable(string)` for use by downstream plugins who wish to determine if
 a plugin is available.
 
 ## Available AWS APIs
@@ -56,71 +56,61 @@ The AWS objects outside of the services Namespace should be considered "Advanced
 
 ### Table of Contents
 
--   [pomegranate-aws-sdk](#pomegranate-aws-sdk)
--   [options](#options)
--   [metadata](#metadata)
--   [plugin](#plugin)
-    -   [load](#load)
-    -   [start](#start)
-    -   [stop](#stop)
--   [awsApis](#awsapis)
-    -   [isAvailable](#isavailable)
+-   [pomegranate-aws-sdk][1]
+    -   [options][2]
+    -   [metadata][3]
+-   [awsApis][4]
+    -   [isAvailable][5]
+    -   [addApiObject][6]
 
 ## 
 
+index.js
+
 **Meta**
 
+-   **author**: Jim Bulkowski &lt;jim.b@paperelectron.com>
+-   **license**: MIT {@link http&#x3A;//opensource.org/licenses/MIT}
+
+## 
+
+./lib/loader.js
+
+**Meta**
+
+-   **author**: Jim Bulkowski &lt;jim.b@paperelectron.com>
 -   **license**: MIT {@link http&#x3A;//opensource.org/licenses/MIT}
 
 ## pomegranate-aws-sdk
 
-A configurable loader for AWS-SDK
+A configurable loader for the Javascript AWS-SDK
+Returns an object available as "AWS" containing the configured AWS-SDK objects, as well as helper
+functions.
 
-## options
+Returns **[awsApis][7]** 
+
+### options
+
+configureable options for this Plugin.
 
 **Properties**
 
--   `awsApis` **[array](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array)&lt;([string](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String) | {name: [string](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String), options: [object](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object)})>** AWS Services that will be loaded into the base AWS injectable object.
+-   `workDir` **[string][8]** Working directory containing AWS mock object files.
+-   `awsApis` **[array][9]&lt;([string][8] | {name: [string][8], options: [object][10]})>** AWS Services that will be loaded into the base AWS injectable object.
     Can be either a string of the name of the AWS service, or an object with name and options parameters.
--   `awsConfig` **[object](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object)** Global AWS configuration that will be provided to aws-sdk before any services are instantiated.
--   `apiVersions` **[object](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object)** Api versions this plugin will use, also loaded before any services are instantiated.
+-   `awsConfig` **[object][10]** Global AWS configuration that will be provided to aws-sdk before any services are instantiated.
+-   `apiVersions` **[object][10]** Api versions this plugin will use, also loaded before any services are instantiated.
+-   `useMocks` **[boolean][11]** Load mock AWS objects instead.
 
-## metadata
+### metadata
+
+Pomegranate Metadata
 
 **Properties**
 
--   `name` **[string](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String)** AwsSDK: Module Internal name used by its logger.
--   `type` **[string](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String)** service: Is a service type plugin.
--   `param` **[string](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String)** AWS: Available on the injector as AWS.
-
-## plugin
-
-### load
-
-Load Hook - Builds the awsApis object and adds it to the injector.
-
-**Parameters**
-
--   `inject`  
--   `loaded`  
-
-Returns **[awsApis](#awsapis)** Adds awsApis to the injector as "AWS"
-
-### start
-
-Start Hook - Not Used.
-
-**Parameters**
-
--   `done`  
-
-### stop
-
-Stop Hook - Not Used.
-
-**Parameters**
-
--   `done`  
+-   `name` **[string][8]** AwsSDK - Downstream dependencies can use this name in depends array.
+-   `type` **[string][8]** service - This plugin returns a single object.
+-   `param` **[string][8]** AWS - Injector parameter name.
 
 ## awsApis
 
@@ -129,16 +119,67 @@ available for use by any downstream plugin.
 
 **Properties**
 
--   `isAvailable` **[function](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function)** 
--   `AWS_Service_Name` **[object](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object)** A dynamic property storing the configured AWS API instance.
+-   `AWS_Service_Name` **[object][10]** A dynamic property storing the configured AWS API instance.
     there will be one for every service listed in the options.awsApis array setting.
 
 ### isAvailable
 
-Allows downstream plugins to determine if an AWS API is available.
+Determines if an AWS API is available on the injector
 
 **Parameters**
 
--   `serviceString`  The name of the AWS API you wish to find the status of.
+-   `serviceString` **[string][8]** 
 
-Returns **[boolean](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Boolean)** 
+**Examples**
+
+```javascript
+let AWS = inject('AWS')
+let hasS3 = AWS.isAvailable('S3') // true
+```
+
+Returns **[boolean][11]** 
+
+### addApiObject
+
+Allows downstream plugins to add additional AWS service APis to this plugins injectable object.
+
+**Parameters**
+
+-   `opts` **[Object][10]** 
+    -   `opts.AwsApi` **[string][8]** The AWS API class that will be added.
+    -   `opts.Opts` **[Object][10]** Options to pass to the requested API Class during instantiation (optional, default `{}`)
+    -   `opts.MockClass` **[Object][10]** Only used when the AwsSDK plugin has "useMocks: true"
+
+**Examples**
+
+```javascript
+let S3Mock = require('some/mock/class.js')
+let AWS = inject('AWS')
+AWS.addApiObject({AwsApi: 'S3', MockClass: S3Mock})
+AWS.S3.listBuckets()
+  .then(console.log)
+```
+
+Returns **[boolean][11]** true if added, false if it already existed.
+
+[1]: #pomegranate-aws-sdk
+
+[2]: #options
+
+[3]: #metadata
+
+[4]: #awsapis
+
+[5]: #isavailable
+
+[6]: #addapiobject
+
+[7]: #awsapis
+
+[8]: https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String
+
+[9]: https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array
+
+[10]: https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object
+
+[11]: https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean

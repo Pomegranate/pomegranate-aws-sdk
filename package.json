@@ -22,6 +22,6 @@
     "magnum-plugin-utils": "^1.4.0"
   },
   "devDependencies": {
-    "documentation": "^4.0.0-rc.1"
+    "documentation": "^6.0.0"
   }
 }
