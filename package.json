@@ -1,6 +1,6 @@
 {
   "name": "pomegranate-aws-sdk",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Pomegranate plugin providing a promisified, configurable AWS SDK object.",
   "main": "index.js",
   "license": "MIT",
