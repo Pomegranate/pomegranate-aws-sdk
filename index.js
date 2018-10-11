@@ -54,52 +54,44 @@ module.exports = {
    * @property {string} param - AWS - Injector parameter name.
    */
   metadata: {
+    frameworkVersion: 6,
     name: 'AwsSDK',
     type: 'service',
     param: 'AWS',
   },
 
   plugin: {
-    load: function(inject, loaded){
-      let Env = inject('Env')
+    load: function(Options, Env, Logger){
       let LoadedAwsApis
-      if(this.options.useMocks){
+      if(Options.useMocks){
 
-        this.Logger.warn('Using Mock AWS objects.')
-        LoadedAwsApis = findMocks(this.options.workDir)
+        Logger.warn('Using Mock AWS objects.')
+        LoadedAwsApis = findMocks(Options.workDir)
 
       } else {
-        this.Logger.log('Using actual AWS API objects, charges may be incurred.')
-        LoadedAwsApis = findActual({Env, Logger: this.Logger})
+        Logger.log('Using actual AWS API objects, charges may be incurred.')
+        LoadedAwsApis = findActual({Env, Logger: Logger})
           .then((AWS) => {
             return configActual({
               AWS,
-              options: this.options,
-              Logger: this.Logger
+              options: Options,
+              Logger: Logger
             })
           })
 
       }
 
-      LoadedAwsApis
+      return LoadedAwsApis
         .then((Classes) => {
-          return loader({Classes, APIs: this.options.awsApis, Logger: this.Logger, usingMocks: this.options.useMocks})
+          return loader({Classes, APIs: Options.awsApis, Logger: Logger, usingMocks: Options.useMocks})
         })
         .then((loadObj) => {
-          loaded(null, loadObj)
+          return loadObj
         })
         .catch((err) => {
-          this.Logger.error(err.message)
-          loaded(err)
+          Logger.error(err.message)
+          throw err
         })
-    },
-
-    start: function(done){
-      done()
-    },
-
-    stop: function(done){
-      done()
     }
   }
 }
